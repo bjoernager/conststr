@@ -3,6 +3,12 @@
 This is the changelog of [conststr](https://crates.io/crates/conststr/).
 See `README.md` for more information.
 
+## 0.1.0
+
+* Add `oct` feature
+* Implement `Encode`, `Decode`, `SizedEncode`, and `DecodeBorrowed<str>` for `String`
+* Update tests
+
 ## 0.0.0
 
 * Add Cargo manifest

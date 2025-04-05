@@ -19,6 +19,13 @@ use {
 	alloc::boxed::Box,
 };
 
+#[cfg(feature = "oct")]
+use {
+	oct::decode::{self, Decode, DecodeBorrowed},
+	oct::encode::{self, Encode, SizedEncode},
+	oct::error::CollectionDecodeError,
+};
+
 #[cfg(feature = "std")]
 use {
 	std::ffi::OsStr,
@@ -45,7 +52,7 @@ use {
 /// let s0 = String::<0x40>::default(); // Empty string.
 /// let s1 = String::<0x40>::from_str("Hello there!").unwrap();
 /// let s2 = String::<0x40>::from_str("أنا من أوروپا").unwrap();
-/// let s3 = String::<0x40>::from_str("COGITO ERGO SUM").unwrap();
+/// let s3 = String::<0x40>::from_str("COGITO·ERGO·SUM").unwrap();
 ///
 /// assert_eq!(size_of_val(&s0), size_of_val(&s1));
 /// assert_eq!(size_of_val(&s0), size_of_val(&s2));
@@ -387,6 +394,52 @@ impl<const N: usize> Debug for String<N> {
 	}
 }
 
+#[cfg(feature = "oct")]
+#[cfg_attr(doc, doc(cfg(feature = "oct")))]
+impl<const N: usize> Decode for String<N> {
+	type Error = CollectionDecodeError<LengthError, Utf8Error>;
+
+	#[inline]
+	#[track_caller]
+	fn decode(input: &mut decode::Input) -> Result<Self, Self::Error> {
+		let Ok(len) = Decode::decode(input);
+
+		if len > N {
+			return Err(CollectionDecodeError::BadLength(
+				LengthError {
+					remaining: N,
+					count:     len,
+				}
+			));
+		}
+
+		let mut buf = [0x00; N];
+		input.read_into(&mut buf[..len]).unwrap();
+
+		if let Err(e) = str::from_utf8(&buf[..len]) {
+			let i = e.valid_up_to();
+			let c = buf[i];
+
+			return Err(CollectionDecodeError::BadItem(
+				Utf8Error {
+					value: c,
+					index: i,
+				},
+			));
+		}
+
+		// SAFETY: We have tested that the first `len`
+		// octets are valid UTF-8. The remaining, if any,
+		// are null and therefore also valid.
+		let this = unsafe { Self::from_raw_parts(buf, len) };
+		Ok(this)
+	}
+}
+
+#[cfg(feature = "oct")]
+#[cfg_attr(doc, doc(cfg(feature = "oct")))]
+impl<const N: usize> DecodeBorrowed<str> for String<N> { }
+
 impl<const N: usize> Default for String<N> {
 	#[inline(always)]
 	fn default() -> Self {
@@ -417,6 +470,19 @@ impl<const N: usize> Display for String<N> {
 	#[inline]
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		Display::fmt(self.as_str(), f)
+	}
+}
+
+#[cfg(feature = "oct")]
+#[cfg_attr(doc, doc(cfg(feature = "oct")))]
+impl<const N: usize> Encode for String<N> {
+	type Error = <str as Encode>::Error;
+
+	/// Encodes using the same format as <code>&lt;[prim@str] as Encode&gt;::encode</code>.
+	#[inline]
+	#[track_caller]
+	fn encode(&self, output: &mut encode::Output) -> Result<(), Self::Error> {
+		(**self).encode(output)
 	}
 }
 
@@ -553,6 +619,14 @@ impl<const N: usize, const M: usize> PartialOrd<String<M>> for String<N> {
 	fn ge(&self, other: &String<M>) -> bool {
 		**self >= **other
 	}
+}
+
+#[cfg(feature = "oct")]
+#[cfg_attr(doc, doc(cfg(feature = "oct")))]
+impl<const N: usize> SizedEncode for String<N> {
+	const MAX_ENCODED_SIZE: usize =
+		usize::MAX_ENCODED_SIZE
+		+ u8::MAX_ENCODED_SIZE * N;
 }
 
 #[cfg(feature = "std")]

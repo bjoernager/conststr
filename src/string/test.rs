@@ -5,6 +5,27 @@
 use core::cmp::Ordering;
 use conststr::{String, string};
 use conststr::error::Utf8Error;
+use oct::decode::{Decode, Input};
+
+#[test]
+fn test_string() {
+	let s: String::<0x4> = "hello world".chars().collect();
+	assert_eq!(s, "hell")
+}
+
+#[test]
+fn test_string_decode() {
+	let data = *b"\x0C\x00if constexpr";
+
+	let mut input = Input::new(&data);
+
+	let s = String::<0x100>::decode(&mut input).unwrap();
+
+	assert_eq!(
+		s,
+		"if constexpr",
+	);
+}
 
 #[test]
 fn test_string_macro() {
@@ -12,12 +33,6 @@ fn test_string_macro() {
 	let s1: String<0x10> = string!("conststr");
 
 	assert_eq!(s0, s1);
-}
-
-#[test]
-fn test_string() {
-	let s: String::<0x4> = "hello world".chars().collect();
-	assert_eq!(s, "hell")
 }
 
 #[test]

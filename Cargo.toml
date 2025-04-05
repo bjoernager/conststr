@@ -2,7 +2,7 @@
 
 [package]
 name          = "conststr"
-version       = "0.0.0"
+version       = "0.1.0"
 authors       = ["Gabriel Bjørnager Jensen"]
 edition       = "2024"
 rust-version  = "1.86"
@@ -15,8 +15,12 @@ license       = "MIT OR Apache-2.0"
 [package.metadata.docs.rs]
 all-features = true
 
+[dependencies]
+oct = { version = "0.22", optional = true }
+
 [features]
 alloc = []
+oct   = ["dep:oct"]
 std   = []
 
 [lints.clippy]
