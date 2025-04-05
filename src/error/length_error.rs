@@ -4,6 +4,9 @@ use core::convert::Infallible;
 use core::error::Error;
 use core::fmt::{self, Display, Formatter};
 
+#[cfg(feature = "oct")]
+use oct::error::GenericDecodeError;
+
 /// A constant string overflowed its buffer.
 #[derive(Debug, Eq, PartialEq)]
 #[must_use]
@@ -28,5 +31,19 @@ impl From<Infallible> for LengthError {
 	#[inline(always)]
 	fn from(_value: Infallible) -> Self {
 		unreachable!()
+	}
+}
+
+#[cfg(feature = "oct")]
+#[cfg_attr(doc, doc(cfg(feature = "oct")))]
+impl From<LengthError> for GenericDecodeError {
+	#[inline(always)]
+	fn from(value: LengthError) -> Self {
+		let e = oct::error::LengthError {
+			remaining: value.remaining,
+			count:     value.count,
+		};
+
+		Self::SmallBuffer(e)
 	}
 }

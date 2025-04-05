@@ -3,6 +3,12 @@
 This is the changelog of [conststr](https://crates.io/crates/conststr/).
 See `README.md` for more information.
 
+## 0.3.0
+
+* Make `alloc` and `std` default features
+* Implement `From<LengthError>` and `From<Utf8Error>` for `oct::error::GenericDecodeError`
+* Add readme
+
 ## 0.2.0
 
 * Add `serde` feature

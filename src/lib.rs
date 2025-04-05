@@ -1,6 +1,6 @@
 // Copyright 2025 Gabriel Bjørnager Jensen.
 
-//! Constant strings.
+//! `conststr` is a Rust crate for `const`-compatible, owning strings.
 
 #![no_std]
 

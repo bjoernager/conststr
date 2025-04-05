@@ -2,12 +2,13 @@
 
 [package]
 name          = "conststr"
-version       = "0.2.0"
+version       = "0.3.0"
 authors       = ["Gabriel Bjørnager Jensen"]
 edition       = "2024"
 rust-version  = "1.86"
 description   = "Constant strings."
 documentation = "https://docs.rs/conststr/"
+readme        = "README.md"
 homepage      = "https://crates.io/crates/conststr/"
 repository    = "https://mandelbrot.dk/bjoernager/conststr/"
 license       = "MIT OR Apache-2.0"
@@ -23,6 +24,8 @@ serde = { version = "1.0", optional = true, default-features = false }
 serde_test = "1.0"
 
 [features]
+default = ["alloc", "std"]
+
 alloc = ["oct/alloc", "serde/alloc"]
 oct   = ["dep:oct"]
 serde = ["dep:serde"]
