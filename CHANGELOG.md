@@ -3,6 +3,16 @@
 This is the changelog of [conststr](https://crates.io/crates/conststr/).
 See `README.md` for more information.
 
+## 0.2.0
+
+* Add `serde` feature
+* Implement `Serialize` and `Deserialize` for `String`
+* Update tests
+* Add `split_at`, `split_at_mut`, `split_at_checked`, and `split_at_mut_checked` methods to `String`
+* Add `is_ascii` method to `String`
+* Add `make_ascii_uppercase` and `make_ascii_lowercase` methods to `String`
+* Update docs
+
 ## 0.1.0
 
 * Add `oct` feature

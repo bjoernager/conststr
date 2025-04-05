@@ -2,6 +2,8 @@
 
 mod test;
 
+mod serde;
+
 use crate::error::{LengthError, Utf8Error};
 
 use core::borrow::{Borrow, BorrowMut};
@@ -68,7 +70,7 @@ pub struct String<const N: usize> {
 }
 
 impl<const N: usize> String<N> {
-	/// Constructs a new, size-constrained string.
+	/// Constructs a new, constant string.
 	///
 	/// The provided string `s` is checked to be containable within `N` bytes.
 	/// See also [`new_unchecked`](Self::new_unchecked).
@@ -93,7 +95,7 @@ impl<const N: usize> String<N> {
 		Ok(this)
 	}
 
-	/// Unsafely constructs a new, size-constrained string.
+	/// Unsafely constructs a new, constant string.
 	///
 	/// See also [`new`](Self::new) for a safe alternative to this constructor.
 	///
@@ -184,14 +186,14 @@ impl<const N: usize> String<N> {
 		unsafe { Self::from_raw_parts(buf, len) }
 	}
 
-	/// Constructs a size-constrained string from raw parts.
+	/// Constructs a constant string from raw parts.
 	///
 	/// The provided parts are not tested in any way.
 	///
 	/// # Safety
 	///
 	/// The value of `len` may not exceed that of `N`.
-	/// Additionally, the octets in `buf` (from index zero up to the value of `len`) must be valid UTF-8 code points.
+	/// Additionally, the octets in `buf` (from index zero up to the value of `len - 1`) must be valid UTF-8 code points.
 	///
 	/// If any of these requirements are violated, behaviour is undefined.
 	#[inline(always)]
@@ -201,6 +203,62 @@ impl<const N: usize> String<N> {
 		debug_assert!(len <= N, "cannot construct string that is longer than its capacity");
 
 		Self { len, buf }
+	}
+
+	/// Converts all ASCII characters to their uppercase equivalent.
+	///
+	/// Non-ASCII octets are ignored.
+	#[inline(always)]
+	pub const fn make_ascii_uppercase(&mut self) {
+		self.as_mut_str().make_ascii_uppercase();
+	}
+
+	/// Converts all ASCII characters to their lowercase equivalent.
+	///
+	/// Non-ASCII octets are ignored.
+	#[inline(always)]
+	pub const fn make_ascii_lowercase(&mut self) {
+		self.as_mut_str().make_ascii_lowercase();
+	}
+
+	/// Splits the string at an index, borrowing the two parts.
+	///
+	/// # Panics
+	///
+	/// If `mid` is not exactly on the boundary of a chacter (as per [`is_char_boundary`](Self::is_char_boundary)), then this method will panic.
+	#[inline(always)]
+	#[must_use]
+	pub const fn split_at(&self, mid: usize) -> (&str, &str) {
+		self.as_str().split_at(mid)
+	}
+
+	/// Splits the string at an index, borrowing the two parts.
+	///
+	/// If `mid` is not exactly on the boundary of a chacter (as per [`is_char_boundary`](Self::is_char_boundary)), then this method will instead return [`None`].
+	#[inline(always)]
+	#[must_use]
+	pub const fn split_at_checked(&self, mid: usize) -> Option<(&str, &str)> {
+		self.as_str().split_at_checked(mid)
+	}
+
+	/// Splits the string at an index, mutably borrowing the two parts.
+	///
+	/// # Panics
+	///
+	/// If `mid` is not exactly on the boundary of a chacter (as per [`is_char_boundary`](Self::is_char_boundary)), then this method will panic.
+	#[inline(always)]
+	#[must_use]
+	pub const fn split_at_mut(&mut self, mid: usize) -> (&mut str, &mut str) {
+		self.as_mut_str().split_at_mut(mid)
+	}
+
+	/// Splits the string at an index, mutably borrowing the two parts.
+	///
+	/// If `mid` is not exactly on the boundary of a chacter (as per [`is_char_boundary`](Self::is_char_boundary)), then this method will instead return [`None`].
+	#[inline(always)]
+	#[must_use]
+	pub const fn split_at_mut_checked(&mut self, mid: usize) -> Option<(&mut str, &mut str)> {
+		self.as_mut_str().split_at_mut_checked(mid)
 	}
 
 	/// Returns the current length of the string.
@@ -219,13 +277,20 @@ impl<const N: usize> String<N> {
 		self.len() == 0x0
 	}
 
-	/// Checks if specified index is on the boundary of a character.
+	/// Checks if a specified index is on the boundary of a character.
 	///
 	/// In this case, character is defined as a set of one to four UTF-8 octets that represent a Unicode code point (specifically a Unicode scalar).
 	#[inline(always)]
 	#[must_use]
 	pub const fn is_char_boundary(&self, index: usize) -> bool {
 		self.as_str().is_char_boundary(index)
+	}
+
+	/// Checks if the entire string is also valid in ASCII.
+	#[inline(always)]
+	#[must_use]
+	pub const fn is_ascii(&self) -> bool {
+		self.as_str().is_ascii()
 	}
 
 	/// Gets a pointer to the first octet.
@@ -313,7 +378,7 @@ impl<const N: usize> String<N> {
 		(buf, len)
 	}
 
-	/// Converts the size-constrained string into a boxed string slice.
+	/// Converts the constant string into a boxed string slice.
 	#[cfg(feature = "alloc")]
 	#[cfg_attr(doc, doc(cfg(feature = "alloc")))]
 	#[inline(always)]
@@ -322,7 +387,7 @@ impl<const N: usize> String<N> {
 		self.as_str().into()
 	}
 
-	/// Converts the size-constrained string into a dynamic string.
+	/// Converts the constant string into a dynamic string.
 	///
 	/// The capacity of the resulting [`alloc::string::String`] object is equal to the value of `N`.
 	#[cfg(feature = "alloc")]

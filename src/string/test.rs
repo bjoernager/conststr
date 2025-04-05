@@ -36,6 +36,20 @@ fn test_string_macro() {
 }
 
 #[test]
+fn test_string_serde() {
+	use serde_test::{assert_tokens, Token};
+
+	let s = String::<0x7F>::new("I\u{2764}serde").unwrap();
+
+	assert_tokens(
+		&s,
+		&[
+			Token::Str("I\u{2764}serde"),
+		],
+	);
+}
+
+#[test]
 fn test_string_size() {
 	let s0: String<0x0C> = string!("Hello there!");
 	let s1: String<0x12> = string!("MEIN_GRO\u{1E9E}_GOTT");
