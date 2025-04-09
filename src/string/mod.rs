@@ -479,7 +479,7 @@ impl<const N: usize> Decode for String<N> {
 		}
 
 		let mut buf = [0x00; N];
-		input.read_into(&mut buf[..len]).unwrap();
+		input.read_into(&mut buf[..len]);
 
 		if let Err(e) = str::from_utf8(&buf[..len]) {
 			let i = e.valid_up_to();

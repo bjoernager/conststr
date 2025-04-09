@@ -3,6 +3,11 @@
 This is the changelog of [conststr](https://crates.io/crates/conststr/).
 See `README.md` for more information.
 
+## 0.3.1
+
+* Bump dependency versions
+* Remove Serde test
+
 ## 0.3.0
 
 * Make `alloc` and `std` default features
