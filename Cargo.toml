@@ -2,7 +2,7 @@
 
 [package]
 name          = "conststr"
-version       = "0.3.1"
+version       = "0.4.0"
 authors       = ["Gabriel Bjørnager Jensen"]
 edition       = "2024"
 rust-version  = "1.86"
@@ -88,7 +88,6 @@ index_refutable_slice              = "warn"
 inefficient_to_string              = "warn"
 infinite_loop                      = "forbid"
 into_iter_without_iter             = "warn"
-invalid_atomic_ordering            = "forbid"
 invalid_upcast_comparisons         = "warn"
 iter_filter_is_ok                  = "warn"
 iter_filter_is_some                = "warn"
@@ -127,7 +126,7 @@ needless_raw_string_hashes         = "warn"
 needless_raw_strings               = "warn"
 no_effect_underscore_binding       = "forbid"
 no_mangle_with_rust_abi            = "forbid"
-non_ascii_literal                  = "forbid"
+non_ascii_literal                  = "deny"
 nonstandard_macro_braces           = "forbid"
 option_as_ref_cloned               = "warn"
 option_if_let_else                 = "warn"
@@ -154,7 +153,7 @@ result_map_unit_fn                 = "forbid"
 result_unit_err                    = "forbid"
 return_self_not_must_use           = "forbid"
 same_functions_in_if_condition     = "warn"
-same_name_method                   = "forbid"
+same_name_method                   = "deny"
 self_named_module_files            = "forbid"
 separated_literal_suffix           = "warn"
 single_char_pattern                = "warn"
@@ -165,7 +164,6 @@ string_lit_as_bytes                = "forbid"
 string_lit_chars_any               = "warn"
 string_to_string                   = "warn"
 suboptimal_flops                   = "forbid"
-test_outside_test_module           = "warn"
 todo                               = "warn"
 trait_duplication_in_bounds        = "forbid"
 transmute_ptr_to_ptr               = "forbid"
@@ -194,8 +192,11 @@ verbose_file_reads                 = "warn"
 wildcard_dependencies              = "forbid"
 zero_prefixed_literal              = "allow"
 
-[profile.release]
-codegen-units = 1
+[lints.rust]
+invalid_atomic_ordering = "forbid"
+missing_docs            = "warn"
 
-lto       = "fat"
-opt-level = 3
+[profile.release]
+opt-level     = 3
+lto           = "fat"
+codegen-units = 1

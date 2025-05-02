@@ -4,8 +4,6 @@
 
 #![no_std]
 
-#![warn(missing_docs)]
-
 #![cfg_attr(doc, feature(doc_cfg))]
 
 extern crate self as conststr;
@@ -19,6 +17,7 @@ extern crate std;
 pub mod error;
 
 mod string;
+mod utf8;
 
 pub use string::{__string, String};
 

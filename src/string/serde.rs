@@ -34,7 +34,7 @@ impl<'de, const N: usize> Visitor<'de> for StringVisitor<N> {
 
 	#[inline]
 	fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
-		String::new(v).map_err(E::custom)
+		String::from_str(v).map_err(E::custom)
 	}
 }
 

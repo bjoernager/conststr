@@ -5,13 +5,14 @@ mod test;
 mod serde;
 
 use crate::error::{LengthError, Utf8Error};
+use crate::utf8::decode_utf8;
 
 use core::borrow::{Borrow, BorrowMut};
 use core::cmp::Ordering;
 use core::fmt::{self, Debug, Display, Formatter};
 use core::hash::{Hash, Hasher};
 use core::ops::{Deref, DerefMut, Index, IndexMut};
-use core::ptr::copy_nonoverlapping;
+use core::ptr::{copy, copy_nonoverlapping};
 use core::slice::{self, SliceIndex};
 use core::str::{self, FromStr};
 
@@ -70,17 +71,30 @@ pub struct String<const N: usize> {
 }
 
 impl<const N: usize> String<N> {
+	/// Constructs a new, empty string.
+	#[inline]
+	#[must_use]
+	pub const fn new() -> Self {
+		let buf = [0x00; N];
+		let len = 0x0;
+
+		// SAFETY: The length is null, which is always
+		// safe.
+		unsafe { Self::from_raw_parts(buf, len) }
+	}
+
 	/// Constructs a new, constant string.
 	///
 	/// The provided string `s` is checked to be containable within `N` bytes.
-	/// See also [`new_unchecked`](Self::new_unchecked).
+	/// See also [`from_str_unchecked`](Self::from_str_unchecked).
 	///
 	/// # Errors
 	///
 	/// If the internal buffer cannot contain the entirety of `s`, then an error is returned.
+	#[allow(clippy::same_name_method)]
 	#[inline]
 	#[track_caller]
-	pub const fn new(s: &str) -> Result<Self, LengthError> {
+	pub const fn from_str(s: &str) -> Result<Self, LengthError> {
 		let len = s.len();
 
 		if len > N {
@@ -91,30 +105,30 @@ impl<const N: usize> String<N> {
 		}
 
 		// SAFETY: We have tested that `s` is not too long.
-		let this = unsafe { Self::new_unchecked(s) };
+		let this = unsafe { Self::from_str_unchecked(s) };
 		Ok(this)
 	}
 
 	/// Unsafely constructs a new, constant string.
 	///
-	/// See also [`new`](Self::new) for a safe alternative to this constructor.
+	/// See also [`from_str`](Self::from_str) for a safe alternative to this constructor.
 	///
 	/// # Safety
 	///
 	/// If the internal buffer cannot contain the entirety of `s`, then the call to this constructor will result in undefined behaviour.
 	#[inline]
 	#[track_caller]
-	pub const unsafe fn new_unchecked(s: &str) -> Self {
+	pub const unsafe fn from_str_unchecked(s: &str) -> Self {
 		let     len = s.len();
 		let mut buf = [0x00; N];
 
 		debug_assert!(len <= N, "cannot construct string from string slice that is longer");
 
-		unsafe {
+		{
 			let src = s.as_ptr();
 			let dst = buf.as_mut_ptr();
 
-			copy_nonoverlapping(src, dst, len);
+			unsafe { copy_nonoverlapping(src, dst, len) };
 		}
 
 		// SAFETY: `str` can be assumed to only contain
@@ -132,6 +146,10 @@ impl<const N: usize> String<N> {
 	///
 	/// Each byte value must be a valid UTF-8 code point.
 	/// If an invalid sequence is found, then this function will return an error.
+	///
+	/// # Panics
+	///
+	/// Calling this function where `M` is greater than `N` will result in a compile-time panic.
 	#[inline]
 	#[track_caller]
 	pub const fn from_utf8<const M: usize>(data: [u8; M]) -> Result<Self, Utf8Error> {
@@ -156,6 +174,10 @@ impl<const N: usize> String<N> {
 	/// The behaviour of a programme that passes invalid values to this function is undefined.
 	///
 	/// Note that it is not undefined to call this function where `M` is greater than `N` as such usage will always be caught at compile-time.
+	///
+	/// # Panics
+	///
+	/// Calling this function where `M` is greater than `N` will result in a compile-time panic.
 	#[inline]
 	#[must_use]
 	#[track_caller]
@@ -203,6 +225,204 @@ impl<const N: usize> String<N> {
 		debug_assert!(len <= N, "cannot construct string that is longer than its capacity");
 
 		Self { len, buf }
+	}
+
+	/// Pushes a character into the string.
+	///
+	/// # Errors
+	///
+	/// If the string cannot contain the provided character, then an error will be returned.
+	#[inline(always)]
+	pub const fn push(&mut self, c: char) -> Result<(), LengthError> {
+		let index = self.len();
+		self.insert(index, c)
+	}
+
+	/// Pushes a string into the string.
+	///
+	/// # Errors
+	///
+	/// If the string cannot contain the provided, other string, then an error will be returned.
+	#[inline(always)]
+	pub const fn push_str(&mut self, s: &str) -> Result<(), LengthError> {
+		let index = self.len();
+		self.insert_str(index, s)
+	}
+
+	/// Inserts a character into the string.
+	///
+	/// # Errors
+	///
+	/// If the string cannot contain the provided character, then an error will be returned.
+	///
+	/// # Panics
+	///
+	/// If `index` is not on a character boundary (including if it is out of bounds), then this method will panic.
+	#[inline]
+	#[track_caller]
+	pub const fn insert(&mut self, index: usize, c: char) -> Result<(), LengthError> {
+		let mut buf = [0x00; 0x4];
+		let s = c.encode_utf8(&mut buf);
+
+		self.insert_str(index, s)
+	}
+
+	/// inserts a string into the string.
+	///
+	/// # Errors
+	///
+	/// If the string cannot contain the provided, other string, then an error will be returned.
+	///
+	/// # Panics
+	///
+	/// If `index` is not on a character boundary (including if it is out of bounds), then this method will panic.
+	#[inline]
+	#[track_caller]
+	pub const fn insert_str(&mut self, index: usize, s: &str) -> Result<(), LengthError> {
+		// Check that the index is valid.
+
+		assert!(
+			self.is_char_boundary(index),
+			"cannot insert into non-character boundary",
+		);
+
+		// Check that we can contain the string.
+
+		let s_len   = s.len();
+		let old_len = self.len();
+		let new_len = old_len.checked_add(s_len).unwrap();
+
+		if new_len > N {
+			return Err(LengthError {
+				remaining: N - old_len,
+				count:     s_len,
+			});
+		}
+
+		// Sift all octets that are in the way (if there
+		// are any).
+		//
+		// To avoid pushing octets into a different memory
+		// block, we only do the sift if insertion doesn't
+		// happen at the last boundary.
+
+		if index < old_len {
+			let base: *mut u8 = unsafe { self.as_mut_ptr().add(index) };
+
+			let len            = old_len - index;
+			let src: *const u8 = base;
+			let dst: *mut   u8 = unsafe { base.add(s_len) };
+
+			unsafe { copy(src, dst, len) };
+		}
+
+		// Insert the string.
+
+		{
+			let src: *const u8 = s.as_ptr();
+			let dst: *mut   u8 = unsafe { self.as_mut_ptr().add(index) };
+
+			unsafe { copy_nonoverlapping(src, dst, s_len) };
+		}
+
+		// Update the length counter and return.
+
+		self.len = new_len;
+
+		Ok(())
+	}
+
+	/// Pops the next character from the string.
+	#[inline]
+	pub const fn pop(&mut self) -> Option<char> {
+		if self.is_empty() {
+			return None;
+		}
+
+		let index = self.prev_char_boundary(self.len());
+
+		let c = self.remove(index);
+		Some(c)
+	}
+
+	/// Removes the character at the specificed index.
+	///
+	/// # Panics
+	///
+	/// If `index` is not at the boundary of a character, or if it is at the very end of the string, then this method will panic.
+	#[inline]
+	pub const fn remove(&mut self, index: usize) -> char {
+		let old_len = self.len();
+
+		// Test if the index is valid.
+
+		// NOTE: This always trips if the string is empty,
+		// which we want anyway.
+		assert!(
+			index < old_len,
+			"cannot remove characters past string",
+		);
+
+		assert!(
+			self.is_char_boundary(index),
+			"cannot remove characters outside of boundaries",
+		);
+
+		// Decode the octets.
+
+		let (c, c_len) = decode_utf8(self.as_str(), index);
+		let next       = index + c_len;
+		let new_len    = old_len - c_len;
+
+		// Sift all octets in place (if there are any
+		// left).
+		//
+		// To avoid pulling octets from a different memory
+		// block, we only do the sift if the next character
+		// isn't at the last boundary.
+
+		if next < old_len {
+			let base: *mut u8 = self.as_mut_ptr();
+
+			let len            = old_len - next;
+			let src: *const u8 = unsafe { base.add(next) };
+			let dst: *mut   u8 = unsafe { base.add(index) };
+
+			unsafe { copy(src, dst, len) };
+		}
+
+		// Update the length counter.
+
+		self.len = new_len;
+
+		// Return the character.
+
+		c
+	}
+
+	/// Truncates the string to the specified length.
+	///
+	/// # Panics
+	///
+	/// This method will panic if the provided length would put the cursor on a non-character boundary.
+	#[inline(always)]
+	pub const fn truncate(&mut self, len: usize) {
+		assert!(
+			self.is_char_boundary(len),
+			"cannot truncate string to non-character boundary",
+		);
+
+		self.len = len;
+	}
+
+	/// Completely clears the string.
+	///
+	/// Calling this method is equivalent to calling [`truncate`](Self::truncate) with a length of `o`.
+	#[inline(always)]
+	pub const fn clear(&mut self) {
+		// SAFETY: `0x0` is always considered a character
+		// boundary.
+		self.len = 0x0;
 	}
 
 	/// Converts all ASCII characters to their uppercase equivalent.
@@ -277,6 +497,38 @@ impl<const N: usize> String<N> {
 		self.len() == 0x0
 	}
 
+	/// Gets the index of the next character boundary.
+	///
+	/// # Panics
+	///
+	/// If `index` references past the last boundary, then this method will panic.
+	#[inline]
+	#[track_caller]
+	#[must_use]
+	const fn prev_char_boundary(&self, index: usize) -> usize {
+		assert!(
+			index <= self.len(),
+			"cannot find character past string",
+		);
+
+		// NOTE: `0x0` is always considered a boundary.
+		let mut i = index.saturating_sub(0x1);
+
+		while i > 0x0 {
+			let octet = self.as_bytes()[i];
+
+			if octet & 0b11000000 != 0b10000000 {
+				break;
+			}
+
+			i -= 0x1;
+		}
+
+		debug_assert!(self.is_char_boundary(i));
+
+		i
+	}
+
 	/// Checks if a specified index is on the boundary of a character.
 	///
 	/// In this case, character is defined as a set of one to four UTF-8 octets that represent a Unicode code point (specifically a Unicode scalar).
@@ -314,8 +566,9 @@ impl<const N: usize> String<N> {
 	#[inline(always)]
 	#[must_use]
 	pub const fn as_bytes(&self) -> &[u8] {
-		// We need to use `from_raw_parts` to mark this
-		// function `const`.
+		// FIXME(const-hack): We need to use
+		// `from_raw_parts` to mark this function with
+		// `const`.
 
 		let ptr = self.as_ptr();
 		let len = self.len();
@@ -333,6 +586,10 @@ impl<const N: usize> String<N> {
 	#[inline(always)]
 	#[must_use]
 	pub const unsafe fn as_bytes_mut(&mut self) -> &mut [u8] {
+		// FIXME(const-hack): We need to use
+		// `from_raw_parts` to mark this function with
+		// `const`.
+
 		let ptr = self.as_mut_ptr();
 		let len = self.len();
 
@@ -346,7 +603,7 @@ impl<const N: usize> String<N> {
 	#[must_use]
 	pub const fn as_str(&self) -> &str {
 		// SAFETY: We guarantee that all octets are always
-		// valid UTF-8 code points.
+		// valid UTF-8 code octets.
 		unsafe { core::str::from_utf8_unchecked(self.as_bytes()) }
 	}
 
@@ -508,10 +765,7 @@ impl<const N: usize> DecodeBorrowed<str> for String<N> { }
 impl<const N: usize> Default for String<N> {
 	#[inline(always)]
 	fn default() -> Self {
-		let buf = [Default::default(); N];
-		let len = 0x0;
-
-		unsafe { Self::from_raw_parts(buf, len) }
+		Self::new()
 	}
 }
 
@@ -556,26 +810,15 @@ impl<const N: usize> Eq for String<N> { }
 impl<const N: usize> FromIterator<char> for String<N> {
 	#[inline]
 	fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
-		let mut buf = [0x00; N];
-		let mut len = 0x0;
+		let mut this = Self::new();
 
 		for c in iter {
-			let rem = N - len;
-			let req = c.len_utf8();
-
-			if rem < req { break }
-
-			let start = len;
-			let end   = start + req;
-
-			c.encode_utf8(&mut buf[start..end]);
-
-			len += req;
+			if this.push(c).is_err() {
+				break;
+			}
 		}
 
-		// SAFETY: All octets are initialised and come from
-		// `char::encode_utf8`.
-		unsafe { Self::from_raw_parts(buf, len) }
+		this
 	}
 }
 
@@ -584,7 +827,7 @@ impl<const N: usize> FromStr for String<N> {
 
 	#[inline]
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		Self::new(s)
+		Self::from_str(s)
 	}
 }
 
@@ -722,7 +965,7 @@ impl<const N: usize> TryFrom<&str> for String<N> {
 
 	#[inline(always)]
 	fn try_from(value: &str) -> Result<Self, Self::Error> {
-		Self::new(value)
+		Self::from_str(value)
 	}
 }
 
@@ -733,7 +976,7 @@ impl<const N: usize> TryFrom<alloc::string::String> for String<N> {
 
 	#[inline(always)]
 	fn try_from(value: alloc::string::String) -> Result<Self, Self::Error> {
-		Self::new(&value)
+		Self::from_str(&value)
 	}
 }
 
@@ -781,5 +1024,5 @@ pub const fn __string<const N: usize>(s: &'static str) -> String<N> {
 
 	// SAFETY: `s` has been tested to not contain more
 	// than `N` octets.
-	unsafe { String::new_unchecked(s) }
+	unsafe { String::from_str_unchecked(s) }
 }

@@ -4,7 +4,7 @@
 
 use core::cmp::Ordering;
 use conststr::{String, string};
-use conststr::error::Utf8Error;
+use conststr::error::{LengthError, Utf8Error};
 use oct::decode::{Decode, Input};
 
 #[test]
@@ -96,4 +96,87 @@ fn test_string_from_utf8() {
 		utf8:   b"20\xE2\x82\xAC",
 		result: Ok(..),
 	);
+}
+
+#[test]
+fn test_string_insert() {
+	let mut s = String::<0xC>::new();
+
+	assert_eq!(s.insert(0x0, '\u{1F480}'), Ok(()));
+	assert_eq!(s.len(),                    0x4);
+	assert_eq!(s,                          "\u{1F480}");
+
+	assert_eq!(s.insert(0x0, '\u{130BA}'), Ok(()));
+	assert_eq!(s.len(),                    0x8);
+	assert_eq!(s,                          "\u{130BA}\u{1F480}");
+
+	assert_eq!(s.insert(0x4,  '\u{81A3}'), Ok(()));
+	assert_eq!(s.len(),                    0xB);
+	assert_eq!(s,                          "\u{130BA}\u{81A3}\u{1F480}");
+
+	assert_eq!(s.insert(0xB,  '!'),        Ok(()));
+	assert_eq!(s.len(),                    0xC);
+	assert_eq!(s,                          "\u{130BA}\u{81A3}\u{1F480}!");
+
+	assert_eq!(s.push('?'),                Err(LengthError { remaining: 0x0, count: 0x1 }));
+	assert_eq!(s.len(),                    0xC);
+	assert_eq!(s,                          "\u{130BA}\u{81A3}\u{1F480}!");
+}
+
+#[test]
+fn test_string_push_pop() {
+	let mut s = String::<0x8>::new();
+
+	assert_eq!(s.push('\u{FFFD}'), Ok(()));
+	assert_eq!(s.len(),            0x3);
+
+	assert_eq!(s.push('\u{0D9E}'), Ok(()));
+	assert_eq!(s.len(),            0x6);
+
+	assert_eq!(s.push('\u{0394}'), Ok(()));
+	assert_eq!(s.len(),            0x8);
+
+	assert_eq!(s.push('!'),        Err(LengthError { remaining: 0x0, count: 0x1 }));
+	assert_eq!(s.len(),            0x8);
+
+	assert_eq!(s.pop(), Some('\u{0394}'));
+	assert_eq!(s.pop(), Some('\u{0D9E}'));
+	assert_eq!(s.pop(), Some('\u{FFFD}'));
+	assert_eq!(s.pop(), None);
+}
+
+#[test]
+fn test_string_remove() {
+	let mut s: String<0x8> = string!("Ma\u{00F1}o\u{351E}");
+
+	assert_eq!(s.len(),       0x8);
+	assert_eq!(s,             "Ma\u{00F1}o\u{351E}");
+
+	assert_eq!(s.remove(0x4), 'o');
+	assert_eq!(s.len(),       0x7);
+	assert_eq!(s,             "Ma\u{00F1}\u{351E}");
+
+	assert_eq!(s.remove(0x2), '\u{00F1}');
+	assert_eq!(s.len(),       0x5);
+	assert_eq!(s,             "Ma\u{351E}");
+
+	assert_eq!(s.remove(0x0), 'M');
+	assert_eq!(s.len(),       0x4);
+	assert_eq!(s,             "a\u{351E}");
+
+	assert_eq!(s.remove(0x1), '\u{351E}');
+	assert_eq!(s.len(),       0x1);
+	assert_eq!(s,             "a");
+
+	assert_eq!(s.remove(0x0), 'a');
+	assert_eq!(s.len(),       0x0);
+	assert_eq!(s,             "");
+}
+
+#[test]
+#[should_panic]
+fn test_string_remove_non_boundary() {
+	let mut s: String<0x4> = string!("\u{5149}");
+
+	let _ = s.remove(0x2);
 }

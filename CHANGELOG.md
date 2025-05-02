@@ -3,6 +3,15 @@
 This is the changelog of [conststr](https://crates.io/crates/conststr/).
 See `README.md` for more information.
 
+## 0.4.0
+
+* Add `push`, `push_str`, `pop`, `insert`, `insert_str`, and `remove` methods to `String`
+* Rename `String::new` and `String::new_unchecked` to `from_str` and `from_str_unchecked`
+* Add new `String::new`
+* Update lints
+* Update tests
+* Add `truncate` and `clear` methods to `String`
+
 ## 0.3.1
 
 * Bump dependency versions
